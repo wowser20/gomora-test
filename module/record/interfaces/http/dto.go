@@ -9,6 +9,8 @@ var (
 	ValidationErrors map[string]string   = map[string]string{
 		"CreateRecordRequest.ID":   "ID field is required.",
 		"CreateRecordRequest.Data": "Data field is required.",
+		"UpdateRecordRequest.ID":   "ID field is required.",
+		"UpdateRecordRequest.Data": "Data field is required.",
 	}
 )
 
@@ -32,6 +34,16 @@ type GetRecordResponse struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
+type GetPaginatedRecordsResponse struct {
+	Records []GetRecordResponse `json:"records"`
+	Total   uint                `json:"total"`
+}
+
 type GenerateTokenResponse struct {
 	AccessToken string `json:"accessToken"`
+}
+
+type UpdateRecordRequest struct {
+	ID   string `json:"id" validate:"required"`
+	Data string `json:"data" validate:"required"`
 }

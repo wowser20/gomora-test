@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
 	"gomora/interfaces/http/rest/viewmodels"
@@ -111,6 +112,55 @@ func (controller *RecordCommandController) CreateRecord(w http.ResponseWriter, r
 	response.JSON(w)
 }
 
+// DeleteRecord deletes a record
+func (controller *RecordCommandController) DeleteRecord(w http.ResponseWriter, r *http.Request) {
+	ID := chi.URLParam(r, "id")
+	if len(ID) == 0 {
+		response := viewmodels.HTTPResponseVM{
+			Status:    http.StatusBadRequest,
+			Success:   false,
+			Message:   "ID is required.",
+			ErrorCode: apiError.InvalidRequestPayload,
+		}
+
+		response.JSON(w)
+		return
+	}
+
+	err := controller.RecordCommandServiceInterface.DeleteRecord(context.TODO(), ID)
+	if err != nil {
+		var httpCode int
+		var errorMsg string
+
+		switch err.Error() {
+		case errors.DatabaseError:
+			httpCode = http.StatusInternalServerError
+			errorMsg = "Error occurred while deleting record."
+		default:
+			httpCode = http.StatusInternalServerError
+			errorMsg = "Please contact technical support."
+		}
+
+		response := viewmodels.HTTPResponseVM{
+			Status:    httpCode,
+			Success:   false,
+			Message:   errorMsg,
+			ErrorCode: err.Error(),
+		}
+
+		response.JSON(w)
+		return
+	}
+
+	response := viewmodels.HTTPResponseVM{
+		Status:  http.StatusOK,
+		Success: true,
+		Message: "Successfully deleted record.",
+	}
+
+	response.JSON(w)
+}
+
 // GenerateToken request handler to generate token
 func (controller *RecordCommandController) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	token, err := controller.RecordCommandServiceInterface.GenerateToken(context.TODO())
@@ -145,6 +195,71 @@ func (controller *RecordCommandController) GenerateToken(w http.ResponseWriter, 
 		Data: &types.GenerateTokenResponse{
 			AccessToken: token,
 		},
+	}
+
+	response.JSON(w)
+}
+
+// UpdateRecord updates a record
+func (controller *RecordCommandController) UpdateRecord(w http.ResponseWriter, r *http.Request) {
+	ID := chi.URLParam(r, "id")
+	if len(ID) == 0 {
+		response := viewmodels.HTTPResponseVM{
+			Status:    http.StatusBadRequest,
+			Success:   false,
+			Message:   "ID is required.",
+			ErrorCode: apiError.InvalidRequestPayload,
+		}
+
+		response.JSON(w)
+		return
+	}
+
+	var request types.UpdateRecordRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		response := viewmodels.HTTPResponseVM{
+			Status:    http.StatusBadRequest,
+			Success:   false,
+			Message:   "Invalid payload request.",
+			ErrorCode: apiError.InvalidRequestPayload,
+		}
+
+		response.JSON(w)
+		return
+	}
+
+	err := controller.RecordCommandServiceInterface.UpdateRecord(context.TODO(), serviceTypes.UpdateRecord{
+		ID:   ID,
+		Data: request.Data,
+	})
+	if err != nil {
+		var httpCode int
+		var errorMsg string
+
+		switch err.Error() {
+		case errors.DatabaseError:
+			httpCode = http.StatusInternalServerError
+			errorMsg = "Error occurred while updating record."
+		default:
+			httpCode = http.StatusInternalServerError
+			errorMsg = "Please contact technical support."
+		}
+
+		response := viewmodels.HTTPResponseVM{
+			Status:    httpCode,
+			Success:   false,
+			Message:   errorMsg,
+			ErrorCode: err.Error(),
+		}
+
+		response.JSON(w)
+		return
+	}
+
+	response := viewmodels.HTTPResponseVM{
+		Status:  http.StatusOK,
+		Success: true,
+		Message: "Successfully updated record.",
 	}
 
 	response.JSON(w)

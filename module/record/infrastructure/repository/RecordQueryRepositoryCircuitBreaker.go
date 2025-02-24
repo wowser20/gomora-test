@@ -12,6 +12,42 @@ type RecordQueryRepositoryCircuitBreaker struct {
 	repository.RecordQueryRepositoryInterface
 }
 
+// SelectRecords decorator pattern for select records repository
+func (repository *RecordQueryRepositoryCircuitBreaker) SelectRecords(page *uint) ([]entity.Record, uint, error) {
+	type outputData struct {
+		Records    []entity.Record
+		TotalCount uint
+	}
+	output := make(chan outputData, 1)
+	errChan := make(chan error, 1)
+
+	hystrix.ConfigureCommand("select_records", config.Settings())
+	errors := hystrix.Go("select_records", func() error {
+		records, totalCount, err := repository.RecordQueryRepositoryInterface.SelectRecords(page)
+		if err != nil {
+			errChan <- err
+			return nil
+		}
+
+		result := outputData{
+			Records:    records,
+			TotalCount: totalCount,
+		}
+
+		output <- result
+		return nil
+	}, nil)
+
+	select {
+	case out := <-output:
+		return out.Records, out.TotalCount, nil
+	case err := <-errChan:
+		return []entity.Record{}, 0, err
+	case err := <-errors:
+		return []entity.Record{}, 0, err
+	}
+}
+
 // SelectRecordByID decorator pattern for select record repository
 func (repository *RecordQueryRepositoryCircuitBreaker) SelectRecordByID(ID string) (entity.Record, error) {
 	output := make(chan entity.Record, 1)

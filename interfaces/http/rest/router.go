@@ -95,6 +95,9 @@ func (router *router) InitRouter() *chi.Mux {
 
 					r.Post("/", recordCommandController.CreateRecord)
 					r.Get("/{id}", recordQueryController.GetRecordByID)
+					r.Get("/list", recordQueryController.GetRecords)
+					r.Put("/{id}/update", recordCommandController.UpdateRecord)
+					r.Delete("/{id}/delete", recordCommandController.DeleteRecord)
 				})
 			})
 		})

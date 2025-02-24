@@ -5,3 +5,8 @@ type CreateRecord struct {
 	ID   string
 	Data string
 }
+
+type UpdateRecord struct {
+	ID   string
+	Data string
+}

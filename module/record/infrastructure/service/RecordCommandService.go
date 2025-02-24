@@ -39,6 +39,16 @@ func (service *RecordCommandService) CreateRecord(ctx context.Context, data type
 	return res, nil
 }
 
+// DeleteRecord deletes a record
+func (service *RecordCommandService) DeleteRecord(ctx context.Context, ID string) error {
+	err := service.RecordCommandRepositoryInterface.DeleteRecord(ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GenerateToken generates a jwt token
 func (service *RecordCommandService) GenerateToken(ctx context.Context) (string, error) {
 	// create access token
@@ -55,6 +65,21 @@ func (service *RecordCommandService) GenerateToken(ctx context.Context) (string,
 	}
 
 	return token, nil
+}
+
+// UpdateRecord updates a record
+func (service *RecordCommandService) UpdateRecord(ctx context.Context, data types.UpdateRecord) error {
+	record := repositoryTypes.UpdateRecord{
+		ID:   data.ID,
+		Data: data.Data,
+	}
+
+	err := service.RecordCommandRepositoryInterface.UpdateRecord(record)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // generateID generates unique id
