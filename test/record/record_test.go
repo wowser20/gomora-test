@@ -10,14 +10,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/joho/godotenv"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
+
+	"gomora/interfaces/http/rest/viewmodels"
+	types "gomora/module/record/interfaces/http"
 )
 
 var (
 	client *http.Client = &http.Client{Timeout: 3 * time.Minute}
 )
+
+var (
+	token  string
+	testID string
+)
+
+// TODO: create test migration with data
+// TODO: try validator package for response validation
 
 func init() {
 	// load our environmental variables.
@@ -26,240 +38,208 @@ func init() {
 	}
 }
 
-// TODO: call main server in test file
-// TODO: get token
-
-// TODO: create test migration with data
-// TODO: try validator package for response validation
-
 // TestRecordEndpoints is a function that tests the record module endpoints
 func TestRecordEndpoints(t *testing.T) {
 	baseURL := fmt.Sprintf("%s:%s", os.Getenv("API_URL_REST"), os.Getenv("API_URL_REST_PORT"))
 	t.Run("Generate Token", func(t *testing.T) {
-		// create request body // TODO: opt to mock data
 		body := map[string]interface{}{
-			"email": "test@example.com",
+			"email": gofakeit.Email(),
 		}
-		jsonBody, _ := json.Marshal(body)
 
-		// create request
-		req, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer(jsonBody))
-		assert.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
+		req := createHTTPRequest(t, "POST", baseURL+"/v1/record/token/generate", nil, body)
 
-		// send the request
 		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		// parse response
-		var response map[string]interface{}
+		var response viewmodels.HTTPResponseVM
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		assert.NoError(t, err)
 
-		// status code should be 200
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 
-		// access token should not be empty
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["accessToken"])
+		expectedData := types.GenerateTokenResponse{}
+
+		jsonData, err := json.Marshal(response.Data)
+		assert.NoError(t, err)
+
+		actualData := types.GenerateTokenResponse{}
+		err = json.Unmarshal(jsonData, &actualData)
+		assert.NoError(t, err)
+
+		/// fetch access token
+		token = actualData.AccessToken
+
+		/// expected response struct type should match the actual response struct type
+		assert.IsType(t, expectedData, actualData)
+
+		/// actual response should not be empty
+		assert.NotEmpty(t, actualData.AccessToken)
 	})
 
 	t.Run("Create Record", func(t *testing.T) {
-		// first generate token
-		tokenReq, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer([]byte(`{"email":"test@example.com"}`)))
-		assert.NoError(t, err)
-		tokenReq.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(tokenReq)
-		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		var tokenResponse map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&tokenResponse)
-		token := tokenResponse["data"].(map[string]interface{})["accessToken"].(string)
-
-		// TODO: should be struct import from dto controllers
-		// create record request
-		request := map[string]interface{}{
-			"id":   generateID(),
-			"data": "Test Description",
+		request := types.CreateRecordRequest{
+			ID:   generateID(),
+			Data: gofakeit.Cat(),
 		}
 
-		buf := new(bytes.Buffer)
-		err = json.NewEncoder(buf).Encode(request)
-		assert.NoError(t, err)
+		req := createHTTPRequest(t, "POST", baseURL+"/v1/record", &token, request)
 
-		req, err := http.NewRequest("POST", baseURL+"/v1/record", buf)
-		assert.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp, err = client.Do(req)
+		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		var response map[string]interface{}
+		var response viewmodels.HTTPResponseVM
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		assert.NoError(t, err)
 
-		// status code should be 201
-		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 
-		// check response fields
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["id"])
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["data"])
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["createdAt"])
+		expectedData := types.CreateRecordResponse{}
+
+		jsonData, err := json.Marshal(response.Data)
+		assert.NoError(t, err)
+
+		actualData := types.CreateRecordResponse{}
+		err = json.Unmarshal(jsonData, &actualData)
+		assert.NoError(t, err)
+
+		/// fetch id
+		testID = actualData.ID
+
+		/// expected response struct type should match the actual response struct type
+		assert.IsType(t, expectedData, actualData)
+
+		/// actual response should not be empty
+		assert.NotEmpty(t, actualData.ID)
+		assert.NotEmpty(t, actualData.Data)
+		assert.NotEmpty(t, actualData.CreatedAt)
 	})
 
 	t.Run("Get Records", func(t *testing.T) {
-		// first generate token
-		tokenReq, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer([]byte(`{"email":"test@example.com"}`)))
-		assert.NoError(t, err)
-		tokenReq.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(tokenReq)
-		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		var tokenResponse map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&tokenResponse)
-		token := tokenResponse["data"].(map[string]interface{})["accessToken"].(string)
-
-		// pagination
 		page := 1
 
-		// get records request
-		req, err := http.NewRequest("GET", baseURL+"/v1/record/list", nil)
-		assert.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+token)
+		req := createHTTPRequest(t, "GET", baseURL+"/v1/record/list", &token, nil)
 
 		q := req.URL.Query()
 		q.Add("page", strconv.Itoa(page))
 		req.URL.RawQuery = q.Encode()
 
-		resp, err = client.Do(req)
+		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		var response map[string]interface{}
+		var response viewmodels.HTTPResponseVM
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		assert.NoError(t, err)
 
-		// status code should be 200
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 
-		// check fields
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["records"])
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["total"])
+		expectedData := types.GetRecordResponse{}
+
+		jsonData, err := json.Marshal(response.Data)
+		assert.NoError(t, err)
+
+		actualData := types.GetRecordResponse{}
+		err = json.Unmarshal(jsonData, &actualData)
+		assert.NoError(t, err)
+
+		/// expected response struct type should match the actual response struct type
+		assert.IsType(t, expectedData, actualData)
+
+		/// actual response should not be empty
+		assert.NotEmpty(t, actualData)
 	})
 
 	t.Run("Get Record By ID", func(t *testing.T) {
-		// first generate token
-		tokenReq, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer([]byte(`{"email":"test@example.com"}`)))
-		assert.NoError(t, err)
-		tokenReq.Header.Set("Content-Type", "application/json")
+		req := createHTTPRequest(t, "GET", baseURL+"/v1/record/"+testID, &token, nil)
 
-		resp, err := client.Do(tokenReq)
+		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		var tokenResponse map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&tokenResponse)
-		token := tokenResponse["data"].(map[string]interface{})["accessToken"].(string)
-
-		// id of the test record to be fetched
-		ID := "4"
-
-		// get record request
-		req, err := http.NewRequest("GET", baseURL+"/v1/record/"+ID, nil)
-		assert.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp, err = client.Do(req)
-		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		// parse response
-		var response map[string]interface{}
+		var response viewmodels.HTTPResponseVM
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		assert.NoError(t, err)
 
-		// status code should be 200
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 
-		// check fields
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["id"])
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["data"])
-		assert.NotEmpty(t, response["data"].(map[string]interface{})["createdAt"])
+		expectedData := types.GetRecordResponse{}
+
+		jsonData, err := json.Marshal(response)
+		assert.NoError(t, err)
+
+		actualData := types.GetRecordResponse{}
+		err = json.Unmarshal(jsonData, &actualData)
+		assert.NoError(t, err)
+
+		/// expected response struct type should match the actual response struct type
+		assert.IsType(t, expectedData, actualData)
+
+		/// actual response should not be empty
+		assert.NotEmpty(t, actualData.ID)
+		assert.NotEmpty(t, actualData.Data)
+		assert.NotEmpty(t, actualData.CreatedAt)
 	})
 
 	t.Run("Update Record", func(t *testing.T) {
-		// first generate token
-		tokenReq, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer([]byte(`{"email":"test@example.com"}`)))
-		assert.NoError(t, err)
-		tokenReq.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(tokenReq)
-		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		var tokenResponse map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&tokenResponse)
-		token := tokenResponse["data"].(map[string]interface{})["accessToken"].(string)
-
-		// update record request
-		request := map[string]interface{}{
-			"data": "Updated Description",
+		request := types.UpdateRecordRequest{
+			ID:   testID,
+			Data: gofakeit.BuzzWord(),
 		}
 
 		buf := new(bytes.Buffer)
-		err = json.NewEncoder(buf).Encode(request)
+		err := json.NewEncoder(buf).Encode(request)
 		assert.NoError(t, err)
 
-		// id of the test record to be updated
-		ID := "4"
+		req := createHTTPRequest(t, "PUT", baseURL+"/v1/record/"+request.ID+"/update", &token, request)
 
-		req, err := http.NewRequest("PUT", baseURL+"/v1/record/"+ID+"/update", buf)
-		assert.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp, err = client.Do(req)
+		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		// status code should be 200
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var response viewmodels.HTTPResponseVM
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		assert.NoError(t, err)
+
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 	})
 
 	t.Run("Delete Record", func(t *testing.T) {
-		// first generate token
-		tokenReq, err := http.NewRequest("POST", baseURL+"/v1/record/token/generate", bytes.NewBuffer([]byte(`{"email":"test@example.com"}`)))
-		assert.NoError(t, err)
-		tokenReq.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(tokenReq)
+		req := createHTTPRequest(t, "DELETE", baseURL+"/v1/record/"+testID+"/delete", &token, nil)
+
+		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		var tokenResponse map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&tokenResponse)
-		token := tokenResponse["data"].(map[string]interface{})["accessToken"].(string)
-
-		// id to be deleted // TODO: opt to mock data
-		ID := "2tTG0HRIIyKBhCJCZIyYMKDIUwG"
-
-		// delete record request
-		req, err := http.NewRequest("DELETE", baseURL+"/v1/record/"+ID+"/delete", nil)
+		var response viewmodels.HTTPResponseVM
+		err = json.NewDecoder(resp.Body).Decode(&response)
 		assert.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+token)
 
-		resp, err = client.Do(req)
-		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		// status code should be 200
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		/// success should be true
+		assert.Equal(t, response.Success, true)
 	})
 }
 
-// generateID generates unique id
 func generateID() string {
 	return ksuid.New().String()
+}
+
+func createHTTPRequest(t *testing.T, method string, url string, token *string, body interface{}) *http.Request {
+	buf := new(bytes.Buffer)
+	err := json.NewEncoder(buf).Encode(body)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest(method, url, buf)
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	if token != nil {
+		req.Header.Set("Authorization", "Bearer "+*token)
+	}
+	return req
 }
