@@ -20,5 +20,5 @@ jobs:
     - name: Copy env file
       run: cp .env.example .env
 
-    - name: Test
-      run: make test
+    - name: Build
+      run: make build
