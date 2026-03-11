@@ -22,3 +22,17 @@ jobs:
 
     - name: Build
       run: make build
+
+    - name: Log in to Gitlab Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: registry.gitlab.com
+        username: ${{ secrets.GITLAB_USERNAME }}
+        password: ${{ secrets.GITLAB_PASSWORD }}
+
+    - name: Push Docker Image to Gitlab Container Registry
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: registry.gitlab.com/nuxify/container-registry/devops-training/gomora:latest
