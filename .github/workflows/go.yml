@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04.3
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
 
@@ -16,6 +16,9 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
+
+    - name: Copy env file
+      run: cp .env.example .env
 
     - name: Build
       run: make build
@@ -27,10 +30,9 @@ jobs:
         username: ${{ secrets.GITLAB_USERNAME }}
         password: ${{ secrets.GITLAB_PASSWORD }}
 
-    - name: Push Docker Image
+    - name: Push Docker Image to Gitlab Container Registry
       uses: docker/build-push-action@v3
       with:
         context: .
         push: true
-        tags: registry.gitlab.com/nuxify/container-registry/devops-training/gomora .
-
+        tags: registry.gitlab.com/nuxify/container-registry/devops-training/gomora:latest
